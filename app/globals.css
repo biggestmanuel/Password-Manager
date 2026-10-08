@@ -1,8 +1,57 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/*
+  The vault is dark-only by design: it is a security tool, and a dark
+  surface keeps shoulder-surfing risk lower in the common case of
+  unlocking it in public.
+*/
+
+@theme {
+  --color-surface: #0b0f17;
+  --color-panel: #111827;
+  --color-panel-hover: #172033;
+  --color-edge: #1f2937;
+  --color-edge-strong: #374151;
+}
+
+html,
+body {
+  background-color: var(--color-surface);
+  color: #e5e7eb;
+}
 
 body {
-  background-color: #0f1115;
-  color: #e5e7eb;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Autofill repaints the browser's yellow background over the dark UI,
+   which makes a filled master-password field unreadable. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #e5e7eb;
+  -webkit-box-shadow: 0 0 0 1000px #1f2937 inset;
+  caret-color: #e5e7eb;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out;
 }
