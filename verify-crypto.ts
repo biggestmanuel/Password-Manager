@@ -86,7 +86,7 @@ async function main() {
   threw = false;
   try {
     const flipped = Buffer.from(sealed.payload, 'base64');
-    flipped[0] ^= 0xff;
+    flipped[0] = (flipped[0] ?? 0) ^ 0xff;
     await decryptEntry(id, { ...sealed, payload: flipped.toString('base64') }, vault.encryptionKey);
   } catch {
     threw = true;

@@ -14,6 +14,12 @@
     "jsx": "preserve",
     "incremental": true,
     "noUncheckedIndexedAccess": true,
+    // Permits explicit `.ts` import specifiers. Next's bundler resolves
+    // extensionless imports fine, but verify-crypto.ts also runs directly
+    // under `node --experimental-strip-types`, and Node's ESM resolver
+    // requires the real extension. This satisfies both without a
+    // separate tsconfig for the script.
+    "allowImportingTsExtensions": true,
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./*"]
