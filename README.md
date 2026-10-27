@@ -116,3 +116,48 @@ These are deliberate scope boundaries, not oversights:
   entries are gone, which is the honest outcome for a zero-knowledge vault
   rather than a backdoor.
 - **No 2FA.** The single master password is a single point of compromise.
+
+## Backend status — this session
+
+All API routes and server lib modules were migrated from JavaScript to TypeScript (strict):
+
+- `app/api/auth/{login,logout,setup,status}/route.ts` — session create/verify/destroy/status
+- `app/api/entries/route.ts` — delta sync (GET) and create (POST)
+- `app/api/entries/[id]/route.ts` — optimistic update (PATCH, `409` on conflict) and tombstone delete (DELETE)
+- `lib/{api,session,supabase,rate-limit,types}.ts` — validation schemas, constant-time secret comparison, server-only Supabase client, rolling + absolute session timeouts, durable DB rate limiting
+
+Verification (all green):
+- `tsc --noEmit` — clean
+- `next build` — green
+- `verify-crypto.ts` — all checks pass (round trip, tamper detection, AAD binding, generator)
+
+Security invariants hold: the service-role key stays server-side (`import 'server-only'`, no `NEXT_PUBLIC_` prefix), RLS is enabled with zero policies, and the encryption key never leaves the browser.
+
+## Code review — full stack
+
+### Backend (API + server lib)
+All six API routes and five server lib modules reviewed. Every route handles ciphertext only — no plaintext site, username, password, or notes ever reaches the server. Session cookie is an opaque random id (not the key), with a 20-minute rolling idle timeout and a 12-hour absolute cap. Login verifies a SHA-256 verifier hash in constant time (`timingSafeEqual`). Rate limiting is durable (DB-backed `vault_login_attempts`, fails closed on DB blips) at 10 attempts per 15 minutes. All lib modules carry `import 'server-only'` so the service-role key can never be bundled into client JS.
+
+### Frontend / client
+- `lib/vault-crypto.ts` — Argon2id root key, HKDF-SHA256 split into a non-extractable AES-256-GCM encryption key and a login verifier; AES-GCM ciphertext bound to the entry id as AAD (row-swap tampering fails authentication); CSPRNG password generator with rejection sampling (no modulo bias) and Fisher-Yates shuffling.
+- `lib/vault-client.ts` — same-origin fetch only (CSP `connect-src 'self'`), throws `AuthError` on 401 so the UI can distinguish session expiry from other failures.
+- `lib/use-vault.ts` — encryption key held in a `useRef`, never React state (DevTools-safe) and never persisted; authenticates before adopting the key; delta sync merges changed rows and applies tombstones; syncs on a 30s interval and on window focus.
+- `components/` — clipboard copy with best-effort 30s clear; delete-with-confirm and undo; client-side search over decrypted data (inherent to zero-knowledge); password strength meter is advisory only.
+
+### Bug fixed this session
+First-run setup discarded the encryption key: `VaultApp` was keyed by `status.vaultExists`, so when setup flipped `vaultExists` `false → true` the component remounted and `useVault`'s in-memory key (a ref, never persisted) was lost. The user was left "unlocked" with an empty, unsyncable vault. Fixed by removing the key so `VaultApp` persists across the transition, and running an immediate sync after setup.
+
+### Verification (all green)
+- `tsc --noEmit` — clean
+- `next build` — green
+- `verify-crypto.ts` — all checks pass (round trip, tamper detection, AAD binding, generator)
+
+### Secrets review (pre-commit, clean)
+No real credentials anywhere: `package-lock.json` `integrity` hashes are published npm hashes, not secrets (documented false positive). `.env.example` contains placeholders only; no `.env`/`.pem`/etc. is tracked; no private variable uses a `NEXT_PUBLIC_` prefix.
+
+What's left (scope boundaries, not bugs):
+
+- Multi-user model (currently one `vault_meta` row)
+- Blind-index search (the server cannot filter ciphertext)
+- Edge-level rate limiting (current limiter trusts `x-forwarded-for`)
+- Password recovery and 2FA (deliberately out of scope for a zero-knowledge vault)

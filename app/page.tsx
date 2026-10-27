@@ -52,8 +52,11 @@ export default function Home() {
     );
   }
 
-  // Split out so the hook is never called conditionally across renders.
-  return <VaultApp key={status.vaultExists ? 'setup-or-login' : 'new'} status={status} onRefresh={refresh} />;
+  // VaultApp persists across setup→login transitions so the in-memory
+  // encryption key (held in a ref inside useVault) is not discarded when
+  // vaultExists flips false→true after first-run setup. useVault is always
+  // called here (never conditionally), so the key is safe.
+  return <VaultApp status={status} onRefresh={refresh} />;
 }
 
 function VaultApp({ status, onRefresh }: { status: VaultStatus; onRefresh: () => Promise<void> }) {
@@ -75,6 +78,9 @@ function VaultApp({ status, onRefresh }: { status: VaultStatus; onRefresh: () =>
       await vault.unlock(password);
     } else {
       await vault.setup(password);
+      // setup() adopts the key but doesn't sync; pull entries down now so
+      // the vault isn't empty until the next poll/focus event.
+      await vault.runSync();
       await onRefresh();
     }
     setUnlocked(true);
