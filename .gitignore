@@ -19,9 +19,8 @@ next-env.d.ts
 .env
 .env*.local
 
-# agent rules -- local working agreement, never committed or pushed (rule 0.1).
-AGENTS.md
-
+# agent rules -- committed so they sync across machines; re-add to this
+# ignore list once you've pulled to your other PC and want it local-only again.
 # testing
 coverage/
 
